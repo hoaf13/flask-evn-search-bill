@@ -2,7 +2,7 @@
     "nodes":["action_start","action_provide_address","action_provide_phone_number","action_provide_code_customer",
         "action_provide_phone_number_confirm","action_provide_code_customer_confirm","action_provide_address_confirm",
         "action_provide_name","action_provide_name_confirm","action_provide_address_repeat",
-        "not_province_forward","not_provide_province_forward","supported_forward","not_required_forward"],
+        "not_province_forward","not_provide_province_forward","supported_forward","not_required_forward","action_provide_province_restart"],
 
     "edges":["intent_provide_address", "intent_affirm","intent_fallback","intent_deny_confirm","intent_this_phone",
         "intent_provide_phone_number", "intent_provide_code_customer","intent_provie_name"],
@@ -16,6 +16,12 @@
             "not_existed":"action_start"
         },
 
+        "action_provide_province_repeat":{
+            "intent_affirm":"action_provide_province",
+            "intent_deny_confirm":"not_required_forward",
+            "intent_fallback":"action_provide_province_repeat"
+        },
+
         "action_provide_province":{    
             "intent_this_phone": "action_provide_phone_number",                
             "intent_provide_phone_number": "action_provide_phone_number",       
@@ -26,8 +32,6 @@
             "intent_deny_confirm":"not_required_forward",
             "intent_fallback":"action_provide_province"
         },        
-
-
 
         "action_provide_phone_number":{
             "intent_this_phone":"action_provide_phone_number_confirm",
