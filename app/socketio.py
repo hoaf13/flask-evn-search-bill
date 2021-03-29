@@ -6,12 +6,17 @@ import json
 from app.models import Message
 from app import db
 import time
+import redis
+
+red = redis.StrictRedis(host='localhost',
+                        port=6379,
+                        db=0)
 
 socketio = SocketIO(app, cors_allowed_origins='*')
 
 @socketio.on('client-start-chat')
 def handle_start_chat(sender_id):
-
+    
     Message.query.delete()
     db.session.commit()
     response = "Xin chào anh chị {}, đây là tổng đài tra cứu tiền điện. Xin hỏi quý khách thuộc tỉnh thành nào vậy?".format(sender_id)
@@ -19,6 +24,14 @@ def handle_start_chat(sender_id):
     message = Message(sender_id=sender_id, intent='', action='action_start', bot_message=response)
     db.session.add(message)
     db.session.commit()
+    
+    field_sender_id = 'field_' + sender_id 
+    count_sender_id = 'count_' + sender_id
+    red.delete(field_sender_id)
+    red.delete(count_sender_id)
+    if red.get(count_sender_id) is None:
+        red.set(count_sender_id, 0) 
+    
     print("{} create action start!!!\n".format(sender_id))
     emit("server-start-chat", response, broadcast=False)
 

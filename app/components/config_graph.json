@@ -92,7 +92,7 @@
         },
         "action_provide_name_confirm":{
             "intent_affirm":"action_search",
-            "intent_provide_name":"action_provide_name",
+            "intent_provide_name":"action_provide_name_confirm",
             "inteny_deny_confirm":"action_provide_name_repeat",
             "intent_fallback": "action_provide_name_confirm"
         },
