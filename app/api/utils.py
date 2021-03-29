@@ -3,7 +3,11 @@ from app.models import Message
 from app import db 
 import random
 import json
+import redis
 
+red = redis.StrictRedis(host='localhost',
+                        port=6379,
+                        db=0)
 
 
 def find_entities(sender_id, message):
@@ -126,7 +130,7 @@ def find_best_action(sender_id, current_intent, entities):
             repeat_count = 0
        
 
-    if previous_intent in ['not_existed','intent_fallback'] and current_intent == 'existed':
+    if previous_intent in ['not_existed','intent_fallback'] and current_intent not in ['not_existed','intent_fallback']:
         repeat_count = 0
 
     if (current_intent == 'intent_this_phone' or current_intent == 'intent_provide_phone_number') and entities['phone_number'] != '' and previous_action == 'action_provide_province':
@@ -147,7 +151,7 @@ def find_best_action(sender_id, current_intent, entities):
 
     # loop-branch 
     if len(list(Message.query.filter_by(sender_id=sender_id).all())) > 1:
-        print("xet loop branch")
+        print("consider in loop branch")
         previous_messages = list(Message.query.filter_by(sender_id=sender_id).all())[-2:]
         previous2_action = previous_messages[0].action
         previous1_action = previous_messages[1].action
@@ -190,6 +194,15 @@ def update_entities(sender_id, intent, entities):
     previous_intent = previous_message.intent
     updated_entities = previous_entities
 
+    previous_message = list(Message.query.filter_by(sender_id=sender_id).all())[-1]
+    previous_action = previous_message.action
+    if previous_action == 'action_provide_province':
+        updated_entities["code"] = ""
+        updated_entities["phone_number"] = ""
+        updated_entities["address"] = ""
+        updated_entities["name"] = ""
+        
+        
     if intent == 'intent_deny_confirm':
         if previous_action == 'action_provide_phone_number_confirm':
             updated_entities['phone_number'] = ''
@@ -223,15 +236,15 @@ def update_entities(sender_id, intent, entities):
         print("update entities intent_affirm or re-type last intent")
         return updated_entities
 
-    if updated_entities['code'] == '':
+    if entities['code'] != '':
         updated_entities['code'] = entities['code']
-    if updated_entities['name'] == '':
+    if entities['name'] != '':
         updated_entities['name'] = entities['name']
-    if updated_entities['address'] == '':
+    if entities['address'] != '':
         updated_entities['address'] = entities['address']
-    if updated_entities['phone_number'] == '':
+    if entities['phone_number'] != '':
         updated_entities['phone_number'] = entities['phone_number']    
-    if updated_entities['province'] == '':
+    if entities['province'] != '':
         updated_entities['province'] = entities['province']
     print("update entities by this client message: {}".format(updated_entities))
     return updated_entities
@@ -247,26 +260,11 @@ def update_entities(sender_id, intent, entities):
 
 
 
-
-
-
-
-
-
-def gernerate_text(sender_id, action, repeat_count, entities):
+def gernerate_text(sender_id, intent, action, repeat_count, entities):
     print("---------------processing in generate_text------------------")
     text = ""
 
     print("action: {}   repeatcount: {}".format(action, repeat_count))
-    if action == 'not_province_forward':
-        province = entities['province']
-        text = "Rất xin lỗi, hiện tại điện lực chưa hỗ trợ tra cứu cho khách hàng thuộc tỉnh {}. Tạm biệt quý khách.".format(province)
-    if action == 'not_provide_province_forward':
-        text = "Xin lỗi em chưa rõ tỉnh thành. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ."
-    if action == 'not_required_forward':
-        text = "Xin lỗi em chưa rõ yêu cầu. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ chi tiết hơn."
-    if action == 'supported_forward':
-        text = "Em rất tiếc không tìm thấy thông tin tiền điện của quý khách. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ."   
     
     if action == 'action_start':
         if repeat_count==0:
@@ -275,10 +273,30 @@ def gernerate_text(sender_id, action, repeat_count, entities):
             text = "Quý khách vui lòng đọc lại tên tỉnh thành chính xác giúp em"
     
     if action == 'action_provide_province_repeat':
+        field_sender_id = 'field_' + str(sender_id)
+        count_sender_id = 'count_' + str(sender_id)
+        used_field = red.get(field_sender_id)
+        print("used_field: {}".format(used_field))
+        used_field = used_field.decode("utf-8") 
+        repeat_count = int(red.get(count_sender_id).decode("utf-8"))
+        print("provide_province_repeat repeat_count: {}".format(repeat_count))
+        fields = ['phone_number', 'code', 'address']
+        en2vn = {
+            'phone_number':'số điện thoại',
+            'code':'mã khách hàng',
+            'address':'địa chỉ'
+        }
+        fields.remove(used_field)
+        print("used field: {} -> {}".format(used_field, fields))
         if repeat_count==0:
-            text = 'Dạ rất tiếc là em chưa rõ yêu cầu của quý khách. Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'
+            red.set(count_sender_id, repeat_count+1)
+            text = 'Dạ rất tiếc là em chưa rõ yêu cầu của quý khách. Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'.format(en2vn[fields[0]],en2vn[fields[1]])
         else:
-            text = 'Em xin hỏi lại 1 lần nữa, Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'
+            if intent == 'intent_fallback' and  repeat_count == 1:
+                text = 'Một lần nữa em xin hỏi, Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'.format(en2vn[fields[0]],en2vn[fields[1]]) 
+            else:
+                action = 'not_required_forward'
+                red.set(count_sender_id, 0)
 
     if action == 'action_provide_province':
         if repeat_count==0:
@@ -287,12 +305,18 @@ def gernerate_text(sender_id, action, repeat_count, entities):
             text = 'Một lần nữa em xin hỏi lại, quý khách muốn tra cứu theo mã khách hàng, theo số điện thoại hay theo địa chỉ vậy?'
 
     if action == 'action_provide_phone_number':
+        field_sender_id = 'field_' + str(sender_id)
+        red.set(field_sender_id, 'phone_number')
+        print("get redis: ", red.get(field_sender_id))
         if repeat_count==0:
             text = 'Quý khách vui lòng đọc số điện thoại trên hợp đồng điện để em tra cứu.'
         else:
-            text = 'Xin lỗi em vẫn chưa hiểu, quý khách nhập lại số điện thoại giúp em.'
+            text = 'Xin lỗi em vẫn chưa hiểu, quý khách vui lòng đọc số điện thoại trên hợp đồng điện giúp em.'
 
     if action == 'action_provide_phone_number_confirm':
+        field_sender_id = 'field_' + str(sender_id)
+        red.set(field_sender_id, 'phone_number')
+        print("get redis: ", red.get(field_sender_id))
         phone_number = entities['phone_number']
         if repeat_count==0:
             text = 'Em xin xác nhận số điện thoại {} có phải không ?'.format(phone_number)
@@ -306,12 +330,16 @@ def gernerate_text(sender_id, action, repeat_count, entities):
             text = 'Xin lỗi em vẫn chưa hiểu, quý khách nhập lại số điện thoại giúp em.'
     
     if action == 'action_provide_code_customer':
+        field_sender_id = 'field_' + str(sender_id)
+        red.set(field_sender_id, 'code')
         if repeat_count==0:
             text = 'Quý khách vui lòng đọc mã khách hàng để em tra cứu'
         else:
             text = 'Xin lỗi em vẫn chưa hiểu, quý khách vui lòng đọc mã khách hàng giúp em.'
 
     if action == 'action_provide_code_customer_confirm':
+        field_sender_id = 'field_' + str(sender_id)
+        red.set(field_sender_id, 'code')
         code = entities['code'] 
         if repeat_count==0:
             text = 'Em xin xác nhận mã khách hàng {} phải không vậy ?'.format(code)
@@ -325,12 +353,16 @@ def gernerate_text(sender_id, action, repeat_count, entities):
             text = 'Xin lỗi em vẫn chưa hiểu, quý khách vui lòng đọc mã khách hàng giúp em.'
 
     if action == 'action_provide_address':
+        field_sender_id = 'field_' + str(sender_id)
+        red.set(field_sender_id, 'address')
         if repeat_count==0:
             text = 'Quý khách vui lòng đọc địa chỉ trên hợp đồng điện giúp em'
         else:
             text = 'Xin lỗi em vẫn chưa nhận được địa chỉ, anh chị viết lại địa chỉ giúp em '
     
     if action == 'action_provide_address_confirm':
+        field_sender_id = 'field_' + str(sender_id)
+        red.set(field_sender_id, 'address')
         address = entities['address']
         if repeat_count==0:
             text = 'Em xin xác nhận địa chỉ {} đúng không vậy'.format(address)
@@ -365,8 +397,16 @@ def gernerate_text(sender_id, action, repeat_count, entities):
         else:
             text = 'Xin lỗi em vẫn chưa hiểu, quý khách có thể đọc lại họ tên được không ạ.'
 
+    if action == 'not_province_forward':
+        province = entities['province']
+        text = "Rất xin lỗi, hiện tại điện lực chưa hỗ trợ tra cứu cho khách hàng thuộc tỉnh {}. Tạm biệt quý khách.".format(province)
+    if action == 'not_provide_province_forward':
+        text = "Xin lỗi em chưa rõ tỉnh thành. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ."
+    if action == 'not_required_forward':
+        text = "Xin lỗi em chưa rõ yêu cầu. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ chi tiết hơn."
     if action == 'supported_forward':
-        text = 'Em rất tiếc không tìm thấy thông tin tiền điện của quý khách. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ.'
+        text = "Em rất tiếc không tìm thấy thông tin tiền điện của quý khách. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ."   
+    
     print(text)
     return text
 

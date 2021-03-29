@@ -39,7 +39,7 @@ class MessageAPI(MethodView):
         intent = find_best_intent(sender_id, message, entities)
         entities = update_entities(sender_id, intent, entities)
         action, repeat_count = find_best_action(sender_id, intent, entities)
-        text = gernerate_text(sender_id, action, repeat_count, entities)
+        text = gernerate_text(sender_id, intent, action, repeat_count, entities)
         instance = save_to_database(sender_id, intent, action, str(entities), message, text)
         
         return jsonify(instance.to_dict())
