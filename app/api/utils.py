@@ -69,17 +69,18 @@ def find_best_intent(sender_id, message, entities):
 
     if entities['phone_number'] == '' and intent in ['intent_this_phone', 'intent_provide_phone_number'] and previous_action == 'action_provide_phone_number':
         intent = 'intent_fallback' 
-        print("here 1")
+        print("choose intent from phone: {}".format(intent))
     if entities['code'] == '' and intent in ['intent_provide_code_customer'] and previous_action == 'action_provide_code_customer':
         intent = 'intent_fallback'
-        print("here 2") 
+        print("choose intent from code: {}".format(intent))
     if entities['address'] == '' and intent in ['intent_provide_address'] and previous_action == 'action_provide_address':
         intent = 'intent_fallback'
-        print("here 3") 
+        print("choose intent from address: {}".format(intent))
     if entities['name'] == '' and intent in ['intent_provide_name'] and previous_action == 'action_provide_name':
         intent = 'intent_fallback'
-        print("here 4")
-    print("last intent: {}".format(intent))
+        print("choose intent from name: {}".format(intent))
+
+    print("auto intent: {}".format(intent))
     return intent
 
 
