@@ -86,6 +86,7 @@ def find_best_intent(sender_id, message, entities):
 
 
 
+
 def find_best_action(sender_id, current_intent, entities):
     print("---------------processing in find_best_action------------------")
     action = None
@@ -131,9 +132,49 @@ def find_best_action(sender_id, current_intent, entities):
     if (current_intent == 'intent_this_phone' or current_intent == 'intent_provide_phone_number') and entities['phone_number'] != '' and previous_action == 'action_provide_province':
         action = 'action_provide_phone_number_confirm'
         repeat_count = 0
+        print("provide phone number before ask")
+        return action, repeat_count
+    if current_intent == 'intent_provide_code_customer' and entities['code'] != '' and previous_action == 'action_provide_province':
+        action = 'action_provide_code_customer_confirm'
+        repeat_count = 0
+        print("provide phone code customer before ask")
+        return action, repeat_count
+    if current_intent == 'intent_provide_address' and entities['address'] != '' and previous_action == 'action_provide_province':
+        action = 'action_provide_address_confirm'
+        repeat_count = 0
+        print("provide phone address before ask")
         return action, repeat_count
 
-
+    # loop-branch 
+    if len(list(Message.query.filter_by(sender_id=sender_id).all())) > 1:
+        print("xet loop branch")
+        previous_messages = list(Message.query.filter_by(sender_id=sender_id).all())[-2:]
+        previous2_action = previous_messages[0].action
+        previous1_action = previous_messages[1].action
+        flag_loop_branch = False
+        if current_intent in ['intent_deny_confirm', 'intent_this_phone', 'intent_provide_phone_number'] \
+            and ( (previous1_action == 'action_provide_phone_number_confirm' and previous2_action == previous1_action) 
+               or (previous1_action == 'action_provide_phone_number_confirm' and previous2_action == 'action_provide_phone_number_repeat') ):
+            flag_loop_branch = True
+        if current_intent in ['intent_deny_confirm', 'intent_provide_code_customer'] \
+            and ( (previous1_action == 'action_provide_code_customer_confirm' and previous2_action == previous1_action) 
+               or (previous1_action == 'action_provide_code_customer_confirm' and previous2_action == 'action_provide_code_customer_repeat') ):
+            flag_loop_branch = True
+        if current_intent in ['intent_deny_confirm', 'intent_provide_address'] \
+            and ( (previous1_action == 'action_provide_address_confirm' and previous2_action == previous1_action) 
+               or (previous1_action == 'action_provide_address_confirm' and previous2_action == 'action_provide_address_repeat') ):
+            flag_loop_branch = True
+        if current_intent in ['intent_deny_confirm', 'intent_provide_name'] \
+            and ( (previous1_action == 'action_provide_name_confirm' and previous2_action == previous1_action) 
+               or (previous1_action == 'action_provide_name_confirm' and previous2_action == 'action_provide_name_repeat') ):
+            flag_loop_branch = True
+        
+        if flag_loop_branch:
+            repeat_count = 0
+            action = 'action_provide_province_repeat'
+            print("go to loop branch")
+            return action, repeat_count
+        
     print("graph {} {}".format(previous_action, current_intent))
     action = graph[previous_action][current_intent]
     print("action: {}".format(action))
@@ -233,11 +274,17 @@ def gernerate_text(sender_id, action, repeat_count, entities):
         else: 
             text = "Quý khách vui lòng đọc lại tên tỉnh thành chính xác giúp em"
     
+    if action == 'action_provide_province_repeat':
+        if repeat_count==0:
+            text = 'Dạ rất tiếc là em chưa rõ yêu cầu của quý khách. Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'
+        else:
+            text = 'Em xin hỏi lại 1 lần nữa, Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'
+
     if action == 'action_provide_province':
         if repeat_count==0:
             text = 'Đầu tiên, quý khách muốn tra cứu theo mã khách hàng, theo số điện thoại hay theo địa chỉ vậy?'
         else:
-            text = 'Dạ rất tiếc là em chưa rõ yêu cầu của quý khách. Quý khách có muốn tra cứu lại theo mã khách hàng, theo số điện thoại hay theo địa chỉ không ạ'
+            text = 'Một lần nữa em xin hỏi lại, quý khách muốn tra cứu theo mã khách hàng, theo số điện thoại hay theo địa chỉ vậy?'
 
     if action == 'action_provide_phone_number':
         if repeat_count==0:
