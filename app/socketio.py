@@ -67,4 +67,7 @@ def handle_client_send_msg(msg):
         print("response api: {}".format(response))  
         time.sleep(1)  
         emit("server-send-msg",response['bot_message'], broadcast=False)
+    if response['action'] in [ "not_province_forward","not_provide_province_forward","supported_forward","not_required_forward","action_provide_province_restart"]:
+        time.sleep(1)
+        emit("server-end",response['bot_message'], broadcast=False)
 

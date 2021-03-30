@@ -45,6 +45,7 @@ $(document).ready(function(){
         socket.emit('client-send-msg', ans)
       }
     });
+
     socket.on('server-send-msg', (msg) => {
       console.log("server-send-msg: " + msg)
       $('.box').append('<li class="bot-msg">' + msg + '<li>')
