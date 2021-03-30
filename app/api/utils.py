@@ -260,6 +260,9 @@ def update_entities(sender_id, intent, entities):
 
 
 
+
+
+
 def gernerate_text(sender_id, intent, action, repeat_count, entities):
     print("---------------processing in generate_text------------------")
     text = ""
@@ -399,7 +402,7 @@ def gernerate_text(sender_id, intent, action, repeat_count, entities):
 
     if action == 'not_province_forward':
         province = entities['province']
-        text = "Rất xin lỗi, hiện tại điện lực chưa hỗ trợ tra cứu cho khách hàng thuộc tỉnh {}. Tạm biệt quý khách.".format(province)
+        text = "Rất xin lỗi, hiện tại điện lực chưa hỗ trợ tra cứu cho khách hàng thuộc tỉnh/thành phố {}. Tạm biệt quý khách.".format(province)
     if action == 'not_provide_province_forward':
         text = "Xin lỗi em chưa rõ tỉnh thành. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ."
     if action == 'not_required_forward':
