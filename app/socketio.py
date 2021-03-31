@@ -7,6 +7,9 @@ from app.models import Message
 from app import db
 import time
 import redis
+from app.api import graph
+
+
 
 red = redis.StrictRedis(host='localhost',
                         port=6379,
@@ -24,15 +27,19 @@ def handle_start_chat(sender_id):
     message = Message(sender_id=sender_id, intent='', action='action_start', bot_message=response)
     db.session.add(message)
     db.session.commit()
+    print("{} create action start!\n".format(sender_id))
     
-    field_sender_id = 'field_' + sender_id 
-    count_sender_id = 'count_' + sender_id
+    # redis:  ['field_', 'count_', 'graph_'] + <sender_id> 
+    field_sender_id = 'field_' + sender_id # phone_number, code, address
+    count_sender_id = 'count_' + sender_id # count the times in loop branch 
+    graph_sender_id = 'graph_' + sender_id # each person has his/her own graph (after loop branch, it losses 1/3 above options)
     red.delete(field_sender_id)
     red.delete(count_sender_id)
+    red.delete(graph_sender_id)
     if red.get(count_sender_id) is None:
         red.set(count_sender_id, 0) 
-    
-    print("{} create action start!!!\n".format(sender_id))
+    red.set(graph_sender_id, str(graph))
+    print("{} create his/her graph".format(sender_id))
     emit("server-start-chat", response, broadcast=False)
 
 
@@ -67,7 +74,7 @@ def handle_client_send_msg(msg):
         print("response api: {}".format(response))  
         time.sleep(1)  
         emit("server-send-msg",response['bot_message'], broadcast=False)
-    if response['action'] in [ "not_province_forward","not_provide_province_forward","supported_forward","not_required_forward","action_provide_province_restart"]:
+    if response['action'] in ['action_have_just_paid','action_not_deadline','action_not_deadline','action_available', "not_province_forward","not_provide_province_forward","supported_forward","not_required_forward","action_provide_province_restart"]:
         time.sleep(1)
         emit("server-end",response['bot_message'], broadcast=False)
 

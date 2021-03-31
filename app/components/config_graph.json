@@ -7,6 +7,7 @@
     "edges":["intent_provide_address", "intent_affirm","intent_fallback","intent_deny_confirm","intent_this_phone",
         "intent_provide_phone_number", "intent_provide_code_customer","intent_provie_name"],
 
+
     "config":{
 
         "action_start":{
@@ -19,7 +20,11 @@
         "action_provide_province_repeat":{
             "intent_affirm":"action_provide_province",
             "intent_deny_confirm":"not_required_forward",
-            "intent_fallback":"action_provide_province_repeat"
+            "intent_fallback":"action_provide_province_repeat",
+            "intent_this_phone":"action_provide_phone_number",
+            "intent_provide_phone_number":"action_provide_phone_number",
+            "intent_provide_address":"action_provide_address",
+            "intent_provide_code_customer":"action_provide_code_customer"            
         },
 
         "action_provide_province":{    
@@ -27,9 +32,6 @@
             "intent_provide_phone_number": "action_provide_phone_number",       
             "intent_provide_code_customer": "action_provide_code_customer",     
             "intent_provide_address": "action_provide_address", 
-            
-            "intent_affirm":"action_provide_province",
-            "intent_deny_confirm":"not_required_forward",
             "intent_fallback":"action_provide_province"
         },        
 
@@ -45,9 +47,7 @@
         "action_provide_address":{
             "intent_provide_address":"action_provide_address_confirm",
             "intent_fallback":"action_provide_address"
-        },   
-        
-        
+        },           
 
         "action_provide_phone_number_confirm":{
             "intent_affirm":"action_search",
@@ -68,7 +68,6 @@
             "intent_deny_confirm":"action_provide_address_repeat",
             "intent_fallback":"action_provide_address_confirm"
         },
-
 
 
         "action_provide_phone_number_repeat":{
@@ -93,13 +92,14 @@
         "action_provide_name_confirm":{
             "intent_affirm":"action_search",
             "intent_provide_name":"action_provide_name_confirm",
-            "inteny_deny_confirm":"action_provide_name_repeat",
+            "intent_deny_confirm":"action_provide_name_repeat",
             "intent_fallback": "action_provide_name_confirm"
         },
         "action_provide_name_repeat":{
             "intent_provide_name":"action_provide_name_confirm",
             "intent_fallback":"action_provide_name_repeat"
         },
+
 
         "action_search":{
             "not_existed": "supported_forward",

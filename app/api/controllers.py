@@ -12,12 +12,8 @@ from app.models import Message
 from app.api.utils import Classifier, Recognizer, find_entities, find_best_intent, find_best_action, gernerate_text,\
     save_to_database, update_entities
 
-
 api = Blueprint('api', __name__, url_prefix='/api')
 endpoint = '/api/messages/'
-
-# initialize
-# db.create_all()
 
 
 class MessageAPI(MethodView):
@@ -49,8 +45,6 @@ app.add_url_rule(endpoint, view_func=MessageAPI_view, methods=['GET','POST'])
 
 
 
-
-
 class EVNSearcher(MethodView):
     def post(self):
         entities = request.json.get('entities')
@@ -73,7 +67,9 @@ class EVNSearcher(MethodView):
             text = 'Em rất tiếc không tìm thấy thông tin tiền điện của quý khách. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ.'
         
         return jsonify({
-            'bot_message':text
+            'bot_message':text,
+            'action': action
         })
+
 EVNSearcher_view = EVNSearcher.as_view('EVNSearcher')
 app.add_url_rule('/api/searchs/', view_func=EVNSearcher_view, methods=['POST'])

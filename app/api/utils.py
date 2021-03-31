@@ -1,4 +1,4 @@
-from . import graph, nodes, edges, Classifier, Recognizer
+from . import nodes, edges, Classifier, Recognizer
 from app.models import Message
 from app import db 
 import random
@@ -66,6 +66,11 @@ def find_best_intent(sender_id, message, entities):
         print("find intent from previous action_start: {}".format(intent))
         return intent
     
+    graph_sender_id = 'graph_' + sender_id
+    graph = red.get(graph_sender_id)
+    graph = eval(graph)
+    if predicted_intent in graph and predicted_intent == 'intent_provide_code_customer':
+        print("ok ok ok")
     if predicted_intent not in graph[previous_action]:
         intent = 'intent_fallback'
         print("find intent not in graph: {}".format(intent))
@@ -99,60 +104,23 @@ def find_best_action(sender_id, current_intent, entities):
     previous_intent = previous_message.intent
     previous_action = previous_message.action
 
-    print("previous intent: {} - previous action: {}".format(previous_intent, previous_action))
-    if previous_intent == 'intent_fallback' or previous_intent == 'not_existed':
-        repeat_count += 1
-    if current_intent == 'intent_fallback' or current_intent == 'not_existed':
-        repeat_count += 1
-    
-    if repeat_count > 1:
-        if previous_action == 'action_start':
-            if previous_intent == 'out':
-                action = 'not_province_forward'
-            if previous_intent == 'not_existed':
-                action = 'not_provide_province_forward'
-        if previous_action == 'action_provide_province':
-            action = 'not_required_forward'
-        if previous_action == 'action_start' and current_intent == 'out':
-            action = 'not_provide_province_forward'
-        if previous_action == 'intent_provide_address' and current_intent == 'out':
-            action = 'not_province_forward'
-        action = 'not_required_forward'
-        print("here in repeat count > 1")
-        return action, repeat_count
-    
-    if repeat_count == 1:
-        if current_intent in ['intent_this_phone', 'intent_provide_phone_number'] and previous_intent == 'intent_fallback' and previous_action == 'action_provide_province':
-            repeat_count = 0
-        if current_intent in ['intent_provide_code_customer'] and previous_intent == 'intent_fallback' and previous_action == 'action_provide_province':
-            repeat_count = 0
-        if current_intent in ['intent_provide_address'] and previous_intent == 'intent_fallback' and previous_action == 'action_provide_province':
-            repeat_count = 0
-       
-
-    if previous_intent in ['not_existed','intent_fallback'] and current_intent not in ['not_existed','intent_fallback']:
-        repeat_count = 0
-
-    if (current_intent == 'intent_this_phone' or current_intent == 'intent_provide_phone_number') and entities['phone_number'] != '' and previous_action == 'action_provide_province':
-        action = 'action_provide_phone_number_confirm'
-        repeat_count = 0
-        print("provide phone number before ask")
-        return action, repeat_count
-    if current_intent == 'intent_provide_code_customer' and entities['code'] != '' and previous_action == 'action_provide_province':
-        action = 'action_provide_code_customer_confirm'
-        repeat_count = 0
-        print("provide phone code customer before ask")
-        return action, repeat_count
-    if current_intent == 'intent_provide_address' and entities['address'] != '' and previous_action == 'action_provide_province':
-        action = 'action_provide_address_confirm'
-        repeat_count = 0
-        print("provide phone address before ask")
-        return action, repeat_count
-
     # loop-branch 
     if len(list(Message.query.filter_by(sender_id=sender_id).all())) > 1:
         print("consider in loop branch")
         previous_messages = list(Message.query.filter_by(sender_id=sender_id).all())[-2:]
+
+        # 2 previous message intents are intent_fallback => go to loop branch
+        previous_intent = previous_messages[1].intent
+        count_sender_id = "count_" + sender_id
+        tmp_repeat_count = red.get(count_sender_id)
+        tmp_repeat_count = int(tmp_repeat_count.decode('utf-8'))
+        if previous_intent == current_intent and current_intent in ['intent_fallback'] and tmp_repeat_count <= 1:
+            red.set(count_sender_id, tmp_repeat_count+1)
+            action = "action_provide_province_repeat"
+            print("2 previous message intents are intent_fallback => go to loop branch")
+            return action, tmp_repeat_count
+            
+        # others
         previous2_action = previous_messages[0].action
         previous1_action = previous_messages[1].action
         flag_loop_branch = False
@@ -177,8 +145,63 @@ def find_best_action(sender_id, current_intent, entities):
             repeat_count = 0
             action = 'action_provide_province_repeat'
             print("go to loop branch")
-            return action, repeat_count
-        
+            return action, repeat_count    
+    
+
+    # xet so lan lap lai intent va action cuoi cung
+    print("previous intent: {} - previous action: {}".format(previous_intent, previous_action))
+    if previous_intent == 'intent_fallback' or previous_intent == 'not_existed':
+        repeat_count += 1
+    if current_intent == 'intent_fallback' or current_intent == 'not_existed':
+        repeat_count += 1
+    
+    if repeat_count > 1:
+        if previous_action == 'action_start':
+            if previous_intent == 'out':
+                action = 'not_province_forward'
+            if previous_intent == 'not_existed':
+                action = 'not_provide_province_forward'
+        if previous_action == 'action_provide_province_repeat':
+            action = 'not_required_forward'
+        if previous_action == 'action_start' and current_intent == 'out':
+            action = 'not_provide_province_forward'
+        if previous_action == 'intent_provide_address' and current_intent == 'out':
+            action = 'not_province_forward'
+        action = 'not_required_forward'
+        print("here in repeat count > 1")
+        return action, repeat_count
+    
+    #dieu chinh lai so lan lap (phuc vu cho sinh text)
+    if repeat_count == 1:
+        if current_intent in ['intent_this_phone', 'intent_provide_phone_number'] and previous_intent == 'intent_fallback' and previous_action in ['action_provide_province', 'action_provide_province_repeat']:
+            repeat_count = 0
+        if current_intent in ['intent_provide_code_customer'] and previous_intent == 'intent_fallback' and previous_action in ['action_provide_province', 'action_provide_province_repeat']:
+            repeat_count = 0
+        if current_intent in ['intent_provide_address'] and previous_intent == 'intent_fallback' and previous_action in ['action_provide_province', 'action_provide_province_repeat']:
+            repeat_count = 0
+    if previous_intent in ['not_existed','intent_fallback'] and current_intent not in ['not_existed','intent_fallback']:
+        repeat_count = 0
+
+    if (current_intent == 'intent_this_phone' or current_intent == 'intent_provide_phone_number') and entities['phone_number'] != '' and previous_action == 'action_provide_province':
+        action = 'action_provide_phone_number_confirm'
+        repeat_count = 0
+        print("provide phone number before ask")
+        return action, repeat_count
+    if current_intent == 'intent_provide_code_customer' and entities['code'] != '' and previous_action == 'action_provide_province':
+        action = 'action_provide_code_customer_confirm'
+        repeat_count = 0
+        print("provide phone code customer before ask")
+        return action, repeat_count
+    if current_intent == 'intent_provide_address' and entities['address'] != '' and previous_action == 'action_provide_province':
+        action = 'action_provide_address_confirm'
+        repeat_count = 0
+        print("provide phone address before ask")
+        return action, repeat_count
+
+    # tra ve ket qua trong truong hop tot nhat. ( khong intent_fallback, khong bi lap, ...)
+    graph_sender_id = 'graph_' + sender_id
+    graph = red.get(graph_sender_id)
+    graph = eval(graph)
     print("graph {} {}".format(previous_action, current_intent))
     action = graph[previous_action][current_intent]
     print("action: {}".format(action))
@@ -278,9 +301,31 @@ def gernerate_text(sender_id, intent, action, repeat_count, entities):
     if action == 'action_provide_province_repeat':
         field_sender_id = 'field_' + str(sender_id)
         count_sender_id = 'count_' + str(sender_id)
+        graph_sender_id = 'graph_' + str(sender_id)
         used_field = red.get(field_sender_id)
-        print("used_field: {}".format(used_field))
         used_field = used_field.decode("utf-8") 
+        print("used_field: {}".format(used_field))
+
+        #remove nodes after come to loop branch
+        graph = red.get(graph_sender_id)
+        graph = eval(graph)
+        remove_edges = []
+        if used_field == 'phone_number':
+            remove_edges.append('intent_this_phone')
+            remove_edges.append('intent_provide_phone_number')
+        if used_field == 'code':
+            remove_edges.append('intent_provide_code_customer')
+        if used_field == 'address':
+            remove_edges.append('intent_provide_address')
+        print("remove edge: ",remove_edges)
+        # for edge in remove_edges:
+        for node in graph.keys():
+            for edge in remove_edges:
+                if edge in graph[node]:
+                    del graph[node][edge]    
+        red.set(graph_sender_id, str(graph))
+
+        # count the times come to loop branch
         repeat_count = int(red.get(count_sender_id).decode("utf-8"))
         print("provide_province_repeat repeat_count: {}".format(repeat_count))
         fields = ['phone_number', 'code', 'address']
@@ -289,8 +334,11 @@ def gernerate_text(sender_id, intent, action, repeat_count, entities):
             'code':'mã khách hàng',
             'address':'địa chỉ'
         }
+
+        # remove used field 
         fields.remove(used_field)
         print("used field: {} -> {}".format(used_field, fields))
+        
         if repeat_count==0:
             red.set(count_sender_id, repeat_count+1)
             text = 'Dạ rất tiếc là em chưa rõ yêu cầu của quý khách. Quý khách có muốn tra cứu lại theo {}, hay theo {} không ạ ?'.format(en2vn[fields[0]],en2vn[fields[1]])
@@ -302,10 +350,26 @@ def gernerate_text(sender_id, intent, action, repeat_count, entities):
                 red.set(count_sender_id, 0)
 
     if action == 'action_provide_province':
-        if repeat_count==0:
-            text = 'Đầu tiên, quý khách muốn tra cứu theo mã khách hàng, theo số điện thoại hay theo địa chỉ vậy?'
+        field_sender_id = 'field_' + sender_id 
+        used_field = red.get(field_sender_id)
+        print("used_field: ", used_field)
+        text = None
+        if used_field == None:
+            text = "theo mã khách hàng, theo số điện thoại hay theo địa chỉ"
         else:
-            text = 'Một lần nữa em xin hỏi lại, quý khách muốn tra cứu theo mã khách hàng, theo số điện thoại hay theo địa chỉ vậy?'
+            used_field = used_field.decode('utf-8')
+        fields = ['phone_number', 'code', 'address']
+        if used_field == 'phone_number':
+            text = "theo mã khách hàng hay theo địa chỉ"
+        if used_field == 'code':
+            text = "theo số điện thoại hay theo địa chỉ"
+        if used_field == 'address':
+            text = "theo mã khách hàng hay theo số điện thoại"
+
+        if repeat_count==0:
+            text = 'Đầu tiên, quý khách muốn tra cứu {} vậy?'.format(text)
+        else:
+            text = 'Một lần nữa em xin hỏi lại, quý khách muốn tra cứu {} vậy?'.format(text)
 
     if action == 'action_provide_phone_number':
         field_sender_id = 'field_' + str(sender_id)
