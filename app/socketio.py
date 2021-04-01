@@ -9,16 +9,21 @@ import time
 import redis
 from app.api import graph
 
-
-
 red = redis.StrictRedis(host='localhost',
                         port=6379,
                         db=0)
 
 socketio = SocketIO(app, cors_allowed_origins='*')
 
+
+
 @socketio.on('client-start-chat')
 def handle_start_chat(sender_id):
+    import requests
+    url = 'http://0.0.0.0:5000'
+    data = {'sender_id':'unk','message':'first request to API'}
+    x = requests.post(url=url, data=data)
+    print(x.text)
     
     Message.query.delete()
     db.session.commit()

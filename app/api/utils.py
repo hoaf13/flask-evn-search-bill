@@ -1,20 +1,41 @@
-from . import nodes, edges, Classifier, Recognizer
+from . import nodes, edges, graph
 from app.models import Message
 from app import db 
 import random
 import json
 import redis
+import pika 
+import datetime
 
 red = redis.StrictRedis(host='localhost',
                         port=6379,
                         db=0)
+connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+channel = connection.channel()
+channel.exchange_declare(exchange="chatbot_direct_logs", exchange_type='direct')
 
 
 def find_entities(sender_id, message):
     print("---------------processing in find_entities------------------")
-    last_message = list(Message.query.filter_by(sender_id=sender_id).all())[-1]
-    name, address, phone_number, code = Recognizer.predict(message)
+    current_time = datetime.datetime.now() 
+    _id = sender_id + '_' + str(current_time) + '_entity'
+    req = {
+        '_id':_id,
+        'message': message
+    }
+    channel.basic_publish(exchange='chatbot_direct_logs', routing_key='binding_entity', body=str(req), properties=pika.BasicProperties(delivery_mode=2))
+    red.set(_id, "")
+    res = None
+    while True:
+        data = red.get(_id)
+        if data != b"":
+            res = data.decode('utf-8')
+            res = eval(res)
+            red.delete(_id)
+            break
+    name, address, phone_number, code = res['name'], res['address'], res['phone_number'], res['code']
     print("find entities name: {}  address: {}  phone_number: {}   code: {}".format(name, address, phone_number, code))
+    last_message = list(Message.query.filter_by(sender_id=sender_id).all())[-1]    
     current_entities = eval(last_message.entities)
     if current_entities['province'] == '':
         current_entities['province'] = address
@@ -23,9 +44,9 @@ def find_entities(sender_id, message):
     current_entities['name'] = name
     current_entities['phone_number'] = phone_number
     current_entities['code'] = code
-
     print("current entities: {}".format(current_entities))
     return current_entities
+    return None
 
 
 
@@ -41,11 +62,27 @@ def find_best_intent(sender_id, message, entities):
 
     print("---------------processing in find_best_intent------------------")
     intent = None
-    predicted_intent, prob = Classifier.predict(message)  
+    current_time = datetime.datetime.now() 
+    _id = sender_id + '_' + str(current_time) + '_intent'
+    req = {
+        '_id':_id,
+        'message': message
+    }
+    channel.basic_publish(exchange='chatbot_direct_logs', routing_key='binding_intent', body=str(req), properties=pika.BasicProperties(delivery_mode=2))
+    red.set(_id, "")
+    res = None
+    while True:
+        data = red.get(_id)
+        if data != b"":
+            res = data.decode('utf-8')
+            res = eval(res)
+            red.delete(_id)
+            break
+    predicted_intent, prob = res['intent'], res['prob']  
     last_message = list(Message.query.filter_by(sender_id=sender_id).all())[-1]
     previous_action = last_message.action
-
     print("predict intent : {} {}".format(predicted_intent, prob))
+    
     if prob < 0.6:
         intent = 'intent_fallback'
         print("find intent: {}".format(intent))
@@ -91,6 +128,7 @@ def find_best_intent(sender_id, message, entities):
 
     print("auto intent: {}".format(intent))
     return intent
+    # return None
 
 
 
@@ -289,8 +327,6 @@ def update_entities(sender_id, intent, entities):
 def gernerate_text(sender_id, intent, action, repeat_count, entities):
     print("---------------processing in generate_text------------------")
     text = ""
-
-    print("action: {}   repeatcount: {}".format(action, repeat_count))
     
     if action == 'action_start':
         if repeat_count==0:
@@ -474,6 +510,7 @@ def gernerate_text(sender_id, intent, action, repeat_count, entities):
     if action == 'supported_forward':
         text = "Em rất tiếc không tìm thấy thông tin tiền điện của quý khách. Vui lòng chờ giây lát, cuộc gọi đang được chuyển cho điện thoại viên hỗ trợ."   
     
+    print("action: {}   repeatcount: {}".format(action, repeat_count))
     print(text)
     return text
 

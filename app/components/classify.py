@@ -6,7 +6,7 @@ import numpy as np
 intents = ['intent_cant_hear','intent_affirm','intent_deny_confirm','intent_provide_phone_number','intent_provide_address',
           'intent_provide_code_customer','intent_provide_name','intent_this_phone']
 
-word2vec_model = KeyedVectors.load_word2vec_format('app/components/pretrained_weights/baomoi.model.bin', binary=True)
+word2vec_model = KeyedVectors.load_word2vec_format('/home/hoaf13/workspace/web_app/flask/EVNsearch/app/components/pretrained_weights/baomoi.model.bin', binary=True)
 
 def embedding(x, max_length = 25):
     ans = []
@@ -32,12 +32,11 @@ def build_model(hidden_size = 512):
     model.compile(optimizer='adam',
                 loss = tf.keras.losses.CategoricalCrossentropy(),
                 metrics=['accuracy'])
-
     model.summary()
     return model
 
 model = build_model()
-model.load_weights('app/components/pretrained_weights/evn-search-pretrained.hdf5')
+model.load_weights('/home/hoaf13/workspace/web_app/flask/EVNsearch/app/components/pretrained_weights/evn-search-pretrained.hdf5')
 
 class Classifier:
     def __init__(self):
@@ -56,3 +55,4 @@ class Classifier:
         intent = intents[index]
         prob = probs[index]
         return intent, prob
+

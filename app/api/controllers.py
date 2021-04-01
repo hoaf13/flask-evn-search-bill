@@ -9,11 +9,12 @@ import random
 from . import graph
 from app import db
 from app.models import Message
-from app.api.utils import Classifier, Recognizer, find_entities, find_best_intent, find_best_action, gernerate_text,\
+from app.api.utils import find_entities, find_best_intent, find_best_action, gernerate_text,\
     save_to_database, update_entities
 
 api = Blueprint('api', __name__, url_prefix='/api')
 endpoint = '/api/messages/'
+
 
 
 class MessageAPI(MethodView):
@@ -73,3 +74,4 @@ class EVNSearcher(MethodView):
 
 EVNSearcher_view = EVNSearcher.as_view('EVNSearcher')
 app.add_url_rule('/api/searchs/', view_func=EVNSearcher_view, methods=['POST'])
+
